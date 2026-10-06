@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.state/
+
+*.session
+*.session-journal
+
+/tmp/
+tmp/
+
+.env
+.env.*
+
+*.log
