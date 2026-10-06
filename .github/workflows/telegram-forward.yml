@@ -1,0 +1,141 @@
+name: Telegram Auto Forward
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # 每 5 分钟运行一次
+    - cron: "*/5 * * * *"
+
+# 防止两个任务同时处理相同消息
+concurrency:
+  group: telegram-auto-forward
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+
+  forward:
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+
+      # =====================================================
+      # 1. 拉取代码
+      # =====================================================
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      # =====================================================
+      # 2. Python
+      # =====================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+
+      # =====================================================
+      # 3. 安装 Tesseract OCR
+      # =====================================================
+
+      - name: Install OCR
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            tesseract-ocr-por \
+            tesseract-ocr-chi-sim
+
+
+      # =====================================================
+      # 4. Python 依赖
+      # =====================================================
+
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+
+      # =====================================================
+      # 5. 恢复 Telegram 状态
+      # =====================================================
+
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: telegram-forward-state-${{ github.run_id }}
+          restore-keys: |
+            telegram-forward-state-
+
+
+      # =====================================================
+      # 6. 运行自动转发
+      # =====================================================
+
+      - name: Run Telegram Forwarder
+        env:
+
+          # Telegram
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+
+          # 来源 -> 目标
+          SOURCE_TO_TARGET: ${{ secrets.SOURCE_TO_TARGET }}
+
+          # 消息设置
+          MESSAGE_LIMIT: ${{ secrets.MESSAGE_LIMIT }}
+          DELAY_SECONDS: ${{ secrets.DELAY_SECONDS }}
+          MODE: ${{ secrets.MODE }}
+
+          # 过滤
+          KEYWORDS: ${{ secrets.KEYWORDS }}
+          BLOCK_KEYWORDS: ${{ secrets.BLOCK_KEYWORDS }}
+
+          # 前后缀
+          PREFIX: ${{ secrets.PREFIX }}
+          SUFFIX: ${{ secrets.SUFFIX }}
+
+          # OCR
+          REPLACE_IMAGE_CONTACT: ${{ secrets.REPLACE_IMAGE_CONTACT }}
+          OCR_LANG: ${{ secrets.OCR_LANG }}
+          OCR_SCALE: ${{ secrets.OCR_SCALE }}
+          OCR_MIN_CONF: ${{ secrets.OCR_MIN_CONF }}
+
+          # 自己的联系方式
+          MY_TELEGRAM: ${{ secrets.MY_TELEGRAM }}
+          MY_WHATSAPP: ${{ secrets.MY_WHATSAPP }}
+          MY_PHONE: ${{ secrets.MY_PHONE }}
+          MY_WEBSITE: ${{ secrets.MY_WEBSITE }}
+
+          # 是否第一次处理历史消息
+          PROCESS_OLD: ${{ secrets.PROCESS_OLD }}
+
+        run: |
+          python forwarder.py
+
+
+      # =====================================================
+      # 7. 保存状态
+      # =====================================================
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: telegram-forward-state-${{ github.run_id }}
