@@ -1,0 +1,6 @@
+telethon==1.45.0
+cryptg
+pillow
+pytesseract
+opencv-python-headless
+numpy
